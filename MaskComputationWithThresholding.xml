@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<executable>
+  <category>Filtering</category>
+  <title>MaskComputationWithThresholding</title>
+  <description>
+   This module apply a threshold on the input image
+  </description>
+  <version>1</version>
+  <documentation-url></documentation-url>
+  <license></license>
+  <contributor>Francois Budin</contributor>
+<acknowledgements>
+</acknowledgements>
+  <parameters>
+    <label>Input/Output</label>
+    <description>Input/output parameters</description>
+    <image type="scalar">
+      <name>inputVolume</name>
+      <label>Input Volume</label>
+      <channel>input</channel>
+      <index>0</index>
+      <description>Input Image</description>
+    </image>
+    <image type="scalar">
+      <name>outputVolume</name>
+      <label>Output Volume</label>
+      <flag>-o</flag>
+      <longflag>--output</longflag>
+      <description>Output Image</description>
+      <default></default>
+    </image>
+    <double>
+      <name>lowerThreshold</name>
+      <flag>-l</flag>
+      <longflag>--lowerThreshold</longflag>
+      <description>Lower Threshold value</description>
+      <label>Lower Threshold value</label>
+      <default>0</default>
+    </double>
+    <double>
+      <name>upperThreshold</name>
+      <flag>-u</flag>
+      <longflag>--upperThreshold</longflag>
+      <description>Upper Threshold value</description>
+      <label>Upper Threshold value</label>
+      <default>0</default>
+    </double>
+    <boolean>
+      <name>autoThreshold</name>
+      <flag>-a</flag>
+      <longflag>--autoThreshold</longflag>
+      <description>Find the threshold automatically (otsu)</description>
+      <label>Automatic Thresholding</label>
+      <default>false</default>
+    </boolean>
+    <integer-enumeration>
+       <name>numberThreshold</name>
+       <flag>-n</flag>
+       <longflag>--numberThreshold</longflag>
+       <description>Choose the number of threshold</description>
+       <label>Number of Thresholding</label>
+      <default>1</default>
+      <element>1</element>
+      <element>2</element>
+    </integer-enumeration>
+    <boolean>
+       <name>threshold</name>
+       <flag>-t</flag>
+       <longflag>--threshold</longflag>
+       <description>exit after computing automatic threshold (sets auto to on)</description>
+       <label>Threshold computation only</label>
+       <default>false</default>
+    </boolean>
+    <integer>
+       <name>numberOfErosions</name>
+       <flag>-e</flag>
+       <longflag>--numberOfErosions</longflag>
+       <description>Number of erosion applied to the binary filter. The number of dilation is deducted from this argument (nb+2 since there are 2 erosions applied on the grayscale image)</description>
+       <label>Number of erosion applied on binary mask</label>
+       <default>6</default>
+       <constraints>
+          <minimum>0</minimum>
+       </constraints>
+    </integer>
+  </parameters>
+</executable>
+
