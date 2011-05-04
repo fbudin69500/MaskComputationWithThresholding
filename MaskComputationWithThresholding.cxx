@@ -13,7 +13,6 @@
 #include <itkScalarImageToHistogramGenerator.h>
 #include <itkOtsuMultipleThresholdsCalculator.h>
 #include <itkMinimumMaximumImageCalculator.h>
-#include <itkFlatStructuringElement.h>
 #include <limits>
 
 #define EXIT_SUCCESS 0
