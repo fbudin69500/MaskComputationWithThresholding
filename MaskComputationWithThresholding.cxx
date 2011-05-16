@@ -50,7 +50,7 @@ template<class T> int DoIt( int argc, char * argv[] )
       thresholdFilter->SetNumberOfThresholds( numberThreshold ) ;
       thresholdFilter->Update() ;
       typename ThresholdFilterType::OutputType thresholds = thresholdFilter->GetOutput() ;
-      std::cout << "Threshold(s): " ;
+      std::cout << "Computed threshold(s) (before scaling): " ;
       for( int i = 0 ; i < numberThreshold ; i++ )
       {
          std::cout << thresholds[ i ] << " " ;
@@ -112,6 +112,8 @@ template<class T> int DoIt( int argc, char * argv[] )
       image = grayscaleErode->GetOutput() ;
       image->DisconnectPipeline() ;
     }
+    upperThreshold *= scaleThreshold ;
+    lowerThreshold *= scaleThreshold ;
     if( upperThreshold > std::numeric_limits< T >::max() )
     {
        upperThreshold = std::numeric_limits< T >::max() ;
