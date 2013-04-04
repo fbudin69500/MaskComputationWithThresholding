@@ -10,6 +10,7 @@
 #include <itkConnectedComponentImageFilter.h>
 #include <itkImageRegionIterator.h>
 #include <itkCastImageFilter.h>
+#include "itkRescaleIntensityImageFilter.h"
 #include <itkScalarImageToHistogramGenerator.h>
 #include <itkOtsuMultipleThresholdsCalculator.h>
 #include <itkMinimumMaximumImageCalculator.h>
@@ -18,20 +19,52 @@
 #define EXIT_SUCCESS 0
 #define EXIT_FAILURE 1
 
-
-
-template<class T> int DoIt( int argc, char * argv[] )
+template<class T> typename itk::Image< T, 3 >::Pointer OpenImage( std::string inputVolume )
 {
-    /////////////////   Get arguments using GenerateCLP parser to get all the arguments  ///////////////////////
-    PARSE_ARGS ;
     typedef itk::Image< T, 3 > InputImageType ;
     /////////////////   Load input file    ////////////////////////////////////////////////
     typedef itk::ImageFileReader< InputImageType > ImageReaderType ;
     typename ImageReaderType::Pointer reader = ImageReaderType::New() ;
     reader->SetFileName( inputVolume ) ;
     reader->Update() ;
+    return reader->GetOutput() ;
+}
+
+//////// If float or double, rescale and convert to short ///////// Added by Adrien Kaiser 04-04-13
+template<class T> typename itk::Image< short, 3 >::Pointer OpenAndRescaleConvertImage( std::string inputVolume )
+{
+    typedef itk::Image< T, 3 > InputImageType ;
+    typedef itk::Image< short, 3 > ConvertedImageType ;
+
+    // Load input file
+    typedef itk::ImageFileReader< InputImageType > ImageReaderType ;
+    typename ImageReaderType::Pointer reader = ImageReaderType::New() ;
     typename InputImageType::Pointer image ;
-    image = reader->GetOutput() ;
+    reader->SetFileName( inputVolume ) ;
+    reader->Update() ;
+
+    // Rescale image to 0 -> 32767
+    typedef itk::RescaleIntensityImageFilter< InputImageType, InputImageType > RescaleFilterType;
+    typename RescaleFilterType::Pointer rescaleFilter = RescaleFilterType::New();
+    rescaleFilter->SetInput( reader->GetOutput() );
+    rescaleFilter->SetOutputMinimum(0);
+    rescaleFilter->SetOutputMaximum(32767); // this line creates warning if Tinput is char/Uchar but OK because if() only if float/double
+
+    // Convert image to short int 
+    typedef itk::CastImageFilter< InputImageType , ConvertedImageType > CastFilterType ;
+    typename CastFilterType::Pointer castFilter = CastFilterType::New() ;
+    castFilter->SetInput( rescaleFilter->GetOutput() ) ;
+    castFilter->Update() ;
+
+    return castFilter->GetOutput() ;
+}
+
+template<class T> int DoIt( int argc, char * argv[], typename itk::Image< T, 3 >::Pointer image )
+{
+    /////////////////   Get arguments using GenerateCLP parser to get all the arguments  ///////////////////////
+    PARSE_ARGS ;
+
+    typedef itk::Image< T, 3 > InputImageType ;
     ////////Automatic threshold////////////////////////////
     if( threshold || autoThreshold )
     {
@@ -262,36 +295,38 @@ int TemplateInputVolume( std::string inputVolume , int argc , char * argv[] )
   {
     GetImageType ( inputVolume , pixelType , componentType ) ;
     // This filter handles all image component types
+
     switch( componentType )
     {
       case itk::ImageIOBase::UCHAR:
-        return DoIt< unsigned char >( argc , argv ) ;
+        return DoIt< unsigned char >( argc , argv, OpenImage< unsigned char >(inputVolume) ) ;
         break ;
       case itk::ImageIOBase::CHAR:
-        return DoIt< char >( argc , argv ) ;
+        return DoIt< char >( argc , argv, OpenImage< char >(inputVolume) ) ;
         break ;
       case itk::ImageIOBase::USHORT:
-        return DoIt< unsigned short >( argc , argv ) ;
+        return DoIt< unsigned short >( argc , argv, OpenImage< unsigned short >(inputVolume) ) ;
         break ;
       case itk::ImageIOBase::SHORT:
-        return DoIt< short >( argc , argv ) ;
+        return DoIt< short >( argc , argv, OpenImage< short >(inputVolume) ) ;
         break ;
       case itk::ImageIOBase::UINT:
-        return DoIt< unsigned int >( argc , argv ) ;
+        return DoIt< unsigned int >( argc , argv, OpenImage< unsigned int >(inputVolume) ) ;
         break ;
       case itk::ImageIOBase::INT:
-        return DoIt< int >( argc , argv ) ;
+        return DoIt< int >( argc , argv, OpenImage< int >(inputVolume) ) ;
         break ;
       case itk::ImageIOBase::ULONG:
-        return DoIt< unsigned long >( argc , argv ) ;
+        return DoIt< unsigned long >( argc , argv, OpenImage< unsigned long >(inputVolume) ) ;
         break ;
       case itk::ImageIOBase::LONG:
-        return DoIt< long >( argc , argv ) ;
+        return DoIt< long >( argc , argv, OpenImage< long >(inputVolume) ) ;
         break ;
       case itk::ImageIOBase::FLOAT:
+        return DoIt< short >( argc , argv, OpenAndRescaleConvertImage< float >(inputVolume) ) ;
+        break ;
       case itk::ImageIOBase::DOUBLE:
-        std::cerr << "Input image voxels must be integers " << std::endl ;
-        return EXIT_FAILURE ;
+        return DoIt< short >( argc , argv, OpenAndRescaleConvertImage< double >(inputVolume) ) ;
         break ;
       case itk::ImageIOBase::UNKNOWNCOMPONENTTYPE:
         default:
