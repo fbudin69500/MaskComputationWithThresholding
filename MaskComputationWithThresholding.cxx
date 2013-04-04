@@ -9,6 +9,7 @@
 #include <itkBinaryDilateImageFilter.h>
 #include <itkConnectedComponentImageFilter.h>
 #include <itkImageRegionIterator.h>
+#include "itkRescaleIntensityImageFilter.h"
 #include <itkCastImageFilter.h>
 #include <itkScalarImageToHistogramGenerator.h>
 #include <itkOtsuMultipleThresholdsCalculator.h>
@@ -18,28 +19,53 @@
 #define EXIT_SUCCESS 0
 #define EXIT_FAILURE 1
 
-
-
-template<class T> int DoIt( int argc, char * argv[] )
+template<class Tinput, class Tuse> int DoIt( int argc, char * argv[], bool InputImageNeedsConvert )
 {
     /////////////////   Get arguments using GenerateCLP parser to get all the arguments  ///////////////////////
     PARSE_ARGS ;
-    typedef itk::Image< T, 3 > InputImageType ;
+    typedef itk::Image< Tinput, 3 > InputImageType ;
+    typedef itk::Image< Tuse, 3 > UseImageType ;
     /////////////////   Load input file    ////////////////////////////////////////////////
     typedef itk::ImageFileReader< InputImageType > ImageReaderType ;
     typename ImageReaderType::Pointer reader = ImageReaderType::New() ;
     reader->SetFileName( inputVolume ) ;
     reader->Update() ;
-    typename InputImageType::Pointer image ;
-    image = reader->GetOutput() ;
+    typename InputImageType::Pointer Inputimage ;
+    Inputimage = reader->GetOutput() ;
+
+    //////// If float or double, rescale and convert to short ///////// Added by Adrien Kaiser 04-04-13
+    typename UseImageType::Pointer image ;
+    typedef itk::CastImageFilter< InputImageType , UseImageType > InputToUseCastFilterType ;
+    typename InputToUseCastFilterType::Pointer InputToUsecastFilter = InputToUseCastFilterType::New() ;
+
+    if( InputImageNeedsConvert ) // if needs to be converted, image will be the output of the rescale filter
+    {
+       // Rescale image to 0 -> 32767
+       typedef itk::RescaleIntensityImageFilter< InputImageType, InputImageType > RescaleFilterType;
+       typename RescaleFilterType::Pointer rescaleFilter = RescaleFilterType::New();
+       rescaleFilter->SetInput( Inputimage );
+       rescaleFilter->SetOutputMinimum(0);
+       rescaleFilter->SetOutputMaximum(32767); // this line creates warning if Tinput is char/Uchar but OK because if() only if float/double
+       // Convert image to short int 
+       InputToUsecastFilter->SetInput( rescaleFilter->GetOutput() ) ;
+       InputToUsecastFilter->Update() ;
+       image = InputToUsecastFilter->GetOutput() ;
+    }
+    else // if no need to be converted, image will just be the input image
+    {
+      InputToUsecastFilter->SetInput( Inputimage ) ;
+      InputToUsecastFilter->Update() ;
+      image = InputToUsecastFilter->GetOutput() ;
+    }
+
     ////////Automatic threshold////////////////////////////
     if( threshold || autoThreshold )
     {
-      typedef itk::MinimumMaximumImageCalculator< InputImageType > MinMaxFilterType ;
+      typedef itk::MinimumMaximumImageCalculator< UseImageType > MinMaxFilterType ;
       typename MinMaxFilterType::Pointer minMaxFilter = MinMaxFilterType::New() ;
       minMaxFilter->SetImage( image ) ;
       minMaxFilter->Compute() ;
-      typedef itk::Statistics::ScalarImageToHistogramGenerator< InputImageType > ImageToHistogramType ;;
+      typedef itk::Statistics::ScalarImageToHistogramGenerator< UseImageType > ImageToHistogramType ;;
       typename ImageToHistogramType::Pointer histogramFilter = ImageToHistogramType::New() ;
       histogramFilter->SetInput( image ) ;
       histogramFilter->SetNumberOfBins( (unsigned int)minMaxFilter->GetMaximum() ) ;
@@ -72,7 +98,7 @@ template<class T> int DoIt( int argc, char * argv[] )
        return EXIT_SUCCESS ;
     }
     ///////Grayscale erosion///////////////////////////////
-    typedef itk::Neighborhood< T , 3 > NeighborhoodType ;
+    typedef itk::Neighborhood< Tuse , 3 > NeighborhoodType ;
     NeighborhoodType neighborhood ;
     neighborhood.SetRadius( 2 ) ;
     for( int i = -2 ; i <= 2 ; i++ )
@@ -89,17 +115,17 @@ template<class T> int DoIt( int argc, char * argv[] )
              neighborhood[ offset ] = val ;
           }
        }
-}
+    }
    /* typedef itk::FlatStructuringElement< 3 > StructuringElementType ;
     itk::Size< 3 > size ;
     size.Fill( 2 ) ;
     StructuringElementType structuringElement = StructuringElementType::Ball( size ) ;*/
-    typedef itk::GrayscaleErodeImageFilter< InputImageType ,
-                                            InputImageType ,
+    typedef itk::GrayscaleErodeImageFilter< UseImageType ,
+                                            UseImageType ,
                                             NeighborhoodType
                                                   > GrayscaleErodeFilterType ;
-    /*typedef itk::GrayscaleErodeImageFilter< InputImageType ,
-                                            InputImageType ,
+    /*typedef itk::GrayscaleErodeImageFilter< UseImageType ,
+                                            UseImageType ,
                                             StructuringElementType
                                                   > GrayscaleErodeFilterType ;*/
     for( int i = 0 ; i < 2 ; i++ )
@@ -114,28 +140,28 @@ template<class T> int DoIt( int argc, char * argv[] )
     }
     upperThreshold *= scaleThreshold ;
     lowerThreshold *= scaleThreshold ;
-    if( upperThreshold > std::numeric_limits< T >::max() )
+    if( upperThreshold > std::numeric_limits< Tuse >::max() )
     {
-       upperThreshold = std::numeric_limits< T >::max() ;
+       upperThreshold = std::numeric_limits< Tuse >::max() ;
     }
-    if( upperThreshold < std::numeric_limits< T >::min() )
+    if( upperThreshold < std::numeric_limits< Tuse >::min() )
     {
-       upperThreshold = std::numeric_limits< T >::min() ;
+       upperThreshold = std::numeric_limits< Tuse >::min() ;
     }
-    if( lowerThreshold > std::numeric_limits< T >::max() )
+    if( lowerThreshold > std::numeric_limits< Tuse >::max() )
     {
-       lowerThreshold = std::numeric_limits< T >::max() ;
+       lowerThreshold = std::numeric_limits< Tuse >::max() ;
     }
-    if( lowerThreshold < std::numeric_limits< T >::min() )
+    if( lowerThreshold < std::numeric_limits< Tuse >::min() )
     {
-       lowerThreshold = std::numeric_limits< T >::min() ;
+       lowerThreshold = std::numeric_limits< Tuse >::min() ;
     }
     //////Threshold///////////////////////////////////////////
     typedef itk::Image< unsigned char, 3 > MaskImageType ;
-    typedef itk::BinaryThresholdImageFilter< InputImageType , MaskImageType > ThresholdFilterType ;
+    typedef itk::BinaryThresholdImageFilter< UseImageType , MaskImageType > ThresholdFilterType ;
     typename ThresholdFilterType::Pointer thresholdFilter = ThresholdFilterType::New() ;
-    thresholdFilter->SetUpperThreshold( (T)upperThreshold ) ;
-    thresholdFilter->SetLowerThreshold( (T)lowerThreshold ) ;
+    thresholdFilter->SetUpperThreshold( (Tuse)upperThreshold ) ;
+    thresholdFilter->SetLowerThreshold( (Tuse)lowerThreshold ) ;
     thresholdFilter->SetInput( image ) ;
     thresholdFilter->Update() ;
     ///////Fill holes///////////////////////////////////////////////////
@@ -265,33 +291,34 @@ int TemplateInputVolume( std::string inputVolume , int argc , char * argv[] )
     switch( componentType )
     {
       case itk::ImageIOBase::UCHAR:
-        return DoIt< unsigned char >( argc , argv ) ;
+        return DoIt< unsigned char, unsigned char >( argc , argv, false ) ;
         break ;
       case itk::ImageIOBase::CHAR:
-        return DoIt< char >( argc , argv ) ;
+        return DoIt< char, char >( argc , argv, false ) ;
         break ;
       case itk::ImageIOBase::USHORT:
-        return DoIt< unsigned short >( argc , argv ) ;
+        return DoIt< unsigned short, unsigned short >( argc , argv, false ) ;
         break ;
       case itk::ImageIOBase::SHORT:
-        return DoIt< short >( argc , argv ) ;
+        return DoIt< short, short >( argc , argv, false ) ;
         break ;
       case itk::ImageIOBase::UINT:
-        return DoIt< unsigned int >( argc , argv ) ;
+        return DoIt< unsigned int, unsigned int >( argc , argv, false ) ;
         break ;
       case itk::ImageIOBase::INT:
-        return DoIt< int >( argc , argv ) ;
+        return DoIt< int, int >( argc , argv, false ) ;
         break ;
       case itk::ImageIOBase::ULONG:
-        return DoIt< unsigned long >( argc , argv ) ;
+        return DoIt< unsigned long, unsigned long >( argc , argv, false ) ;
         break ;
       case itk::ImageIOBase::LONG:
-        return DoIt< long >( argc , argv ) ;
+        return DoIt< long, long >( argc , argv, false ) ;
         break ;
       case itk::ImageIOBase::FLOAT:
+        return DoIt< float, short >( argc , argv, true ) ;
+        break ;
       case itk::ImageIOBase::DOUBLE:
-        std::cerr << "Input image voxels must be integers " << std::endl ;
-        return EXIT_FAILURE ;
+        return DoIt< double, short >( argc , argv, true ) ;
         break ;
       case itk::ImageIOBase::UNKNOWNCOMPONENTTYPE:
         default:
