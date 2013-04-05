@@ -4,24 +4,12 @@ PROJECT(MaskComputationWithThresholding)
 
 
 #####################     ITK    ############################################
-  FIND_PACKAGE(ITK REQUIRED)
-  IF(USE_ITK_FILE)
-    INCLUDE(${USE_ITK_FILE})
-  ENDIF(USE_ITK_FILE)
-#  INCLUDE_DIRECTORIES( 
-#    ${ITK_SOURCE_DIR}/Code
-#    )
-  SET(ITK_LIBRARIES
-    ITKCommon
-    ITKIO
-    ITKNumerics
-    ITKBasicFilters
-    ITKAlgorithms
-    )
-  LINK_LIBRARIES(
-    ${ITK_LIBRARIES}
-    )
-
+FIND_PACKAGE(ITK)
+IF(ITK_FOUND)
+  INCLUDE(${ITK_USE_FILE})
+ELSE(ITK_FOUND)
+   MESSAGE(FATAL_ERROR "ITK not found. Please set ITK_DIR.") 
+ENDIF(ITK_FOUND)
 
 find_package(GenerateCLP REQUIRED)
 if(GenerateCLP_FOUND)
